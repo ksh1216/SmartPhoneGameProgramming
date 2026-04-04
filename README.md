@@ -18,6 +18,24 @@
 
 ### 예상 게임 실행 흐름
 
+실제 개발 예시 화면
+
+
+![1](https://github.com/ksh1216/SmartPhoneGameProgramming/blob/main/%EC%98%88%EC%83%81%20%ED%94%8C%EB%A0%88%EC%9D%B4%20%ED%99%94%EB%A9%B4.png)
+
+게임 시작 시 박스 상단 위에 자신이 떨어뜨릴 과일이 생성
+
+이 후 좌우 스크롤로 떨어뜨릴 과일의 위치를 설정 후 화면에서 터치를 풀 시 과일이 그 위치에서 떨어짐
+
+이 때 같은 과일 끼리 부딪히면 상위 과일로 합성이 되며 점수를 획득함
+
+![2](https://github.com/ksh1216/SmartPhoneGameProgramming/blob/main/%ED%95%A9%EC%B9%98%EA%B8%B0%20%EC%98%88%EC%A0%9C.png)
+
+
+과일을 떨어뜨리다 쌓인 과일들이 데드라인을 넘길 경우 게임 오버 및 점수를 집계
+
+![3](https://github.com/ksh1216/SmartPhoneGameProgramming/blob/main/%EA%B2%8C%EC%9E%84%20%EC%98%A4%EB%B2%84.png)
+
 
 
 ### 개발 일정
