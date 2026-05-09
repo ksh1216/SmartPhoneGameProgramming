@@ -17,6 +17,8 @@
 
 
 ![깃커밋횟수](https://github.com/ksh1216/SmartPhoneGameProgramming/blob/main/Git%20commit.PNG)
+
+
 github-insight-commits의 경우 제출일에 이 Readme를 작성하여 오늘자 commit이 올라가지 않음으로 위 사진으로 대체
 프로젝트를 진행한 커밋의 경우 총 2회
 
