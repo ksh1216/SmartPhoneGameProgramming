@@ -62,6 +62,9 @@ getGradeColor(grade: Int) - 각 과일의 색상을 결정
 update(gctx: GameContext) - 외부에서 조작되는 상태 변수에 중력과 마찰력을 연산하여 최종적인 과일의 좌표를 확정시킴
 
 
+!(게임예시)[https://github.com/ksh1216/SmartPhoneGameProgramming/blob/main/%EC%88%98%EB%B0%95%EA%B2%8C%EC%9E%84%20%EC%98%88%EC%8B%9C.PNG]
+
+
 
 
 구현시 어려운 점
