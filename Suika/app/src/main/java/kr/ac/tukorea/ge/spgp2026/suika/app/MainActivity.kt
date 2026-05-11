@@ -24,7 +24,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startGameActivity() {
-        // 실제 게임이 구동되는 Activity(CookieRunActivity)를 실행합니다.
         val intent = Intent(this, SuikaActivity::class.java)
         startActivity(intent)
     }
