@@ -12,7 +12,6 @@ import kotlin.math.sqrt
 
 class MainScene(gctx: GameContext) : Scene(gctx) {
 
-    // 1. 레이어 정의
     enum class Layer {
         BACKGROUND, FRUIT, TOP_FRUIT, UI, COUNT
     }
@@ -20,31 +19,65 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     override val world = World(Layer.entries.toTypedArray())
 
     private var currentFruit: Fruit? = null
+
+    // 분리된 매니저 클래스들 객체 생성
+    private lateinit var scoreManager: ScoreManager
+    private val gameOverDetector = GameOverDetector() // [변경] 독립 클래스로 장착
+
+    // Paint 도구들
     private val wallPaint = Paint().apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
         strokeWidth = 10f
     }
 
-    // 화면 전체 크기 및 실제 플레이 박스 경계 정의
+    private val deadLinePaint = Paint().apply {
+        color = Color.parseColor("#FF9800")
+        style = Paint.Style.STROKE
+        strokeWidth = 5f
+    }
+
+    private val uiLabelPaint = Paint().apply {
+        color = Color.BLACK
+        textSize = 35f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+
+    private val uiScorePaint = Paint().apply {
+        color = Color.BLACK
+        textSize = 45f
+        textAlign = Paint.Align.CENTER
+    }
+
+    private val gameOverPaint = Paint().apply {
+        color = Color.RED
+        textSize = 100f
+        textAlign = Paint.Align.CENTER
+        isFakeBoldText = true
+    }
+
+    // 화면 크기 및 플레이 박스 경계 정의
     private val gameWidth = 900f
     private val gameHeight = 1600f
 
-    private val playBoxTop = 250f     // UI 공간 경계선
-    private val playBoxLeft = 20f     // 좌측 벽 여백
-    private val playBoxRight = 880f   // 우측 벽 여백
-    private val groundY = 1550f       // 바닥 높이
+    private val playBoxTop = 250f     // 데드라인 기준선
+    private val playBoxLeft = 20f
+    private val playBoxRight = 880f
+    private val groundY = 1550f
 
     init {
+        scoreManager = ScoreManager(gctx.view.context)
         prepareNextFruit()
     }
 
     private fun prepareNextFruit() {
-        // 0~2단계 사이의 과일 랜덤 생성
+        // [변경] Detector 객체에게 상태를 물어봅니다.
+        if (gameOverDetector.isGameOver) return
+
         val grade = (0..2).random()
         val fruit = Fruit(grade)
 
-        // [수정] 과일의 중앙(Center Y)이 검정 사각형 상단 선(playBoxTop = 250f)에 정확히 일치하도록 설정
         fruit.setCenter(gameWidth / 2, playBoxTop)
         currentFruit = fruit
         world.add(fruit, Layer.TOP_FRUIT)
@@ -53,8 +86,20 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     override fun update(gctx: GameContext) {
         super.update(gctx)
 
-        solvePhysics() // 물리 연산 (밀어내기 및 벽 충돌)
-        checkMerge()    // 합성 체크
+        // [변경] 플레이 중일 때만 물리 연산 및 합성을 수행
+        if (!gameOverDetector.isGameOver) {
+            solvePhysics()
+            checkMerge()
+
+            // [변경] 과일 리스트를 추출하여 전담 디텍터 클래스에게 상시 검사를 맡깁니다.
+            val fruits = world.objectsAt(Layer.FRUIT).filterIsInstance<Fruit>()
+            gameOverDetector.update(fruits, playBoxTop, gctx.frameTime)
+
+            // 방금 검사로 인해 게임오버로 전환되었다면 조작 과일 제거
+            if (gameOverDetector.isGameOver) {
+                currentFruit = null
+            }
+        }
     }
 
     private fun solvePhysics() {
@@ -63,29 +108,20 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
         for (i in fruits.indices) {
             val f1 = fruits[i]
 
-            // 1. 플레이 박스 사방 벽 및 바닥 충돌 처리
-            if (f1.x - f1.radius < playBoxLeft) {
-                f1.x = playBoxLeft + f1.radius
-                f1.dx *= -0.5f
-            }
-            if (f1.x + f1.radius > playBoxRight) {
-                f1.x = playBoxRight - f1.radius
-                f1.dx *= -0.5f
-            }
+            if (f1.x - f1.radius < playBoxLeft) { f1.x = playBoxLeft + f1.radius; f1.dx *= -0.5f }
+            if (f1.x + f1.radius > playBoxRight) { f1.x = playBoxRight - f1.radius; f1.dx *= -0.5f }
 
             if (f1.y + f1.radius > groundY) {
                 f1.y = groundY - f1.radius
                 f1.stopVertical()
-                f1.dx *= 0.8f // 바닥 마찰력
+                f1.dx *= 0.8f
             }
 
-            // 과일이 위쪽 UI 영역으로 튀어 올라가는 것을 방지
-            if (f1.y - f1.radius < playBoxTop && f1.dy < 0) {
-                f1.y = playBoxTop + f1.radius
+            if (f1.y - f1.radius < playBoxTop - 100f && f1.dy < 0) {
+                f1.y = playBoxTop - 100f + f1.radius
                 f1.dy *= -0.2f
             }
 
-            // 2. 과일 간 밀어내기 및 굴러떨어지기 로직
             for (j in i + 1 until fruits.size) {
                 val f2 = fruits[j]
                 val distX = f2.x - f1.x
@@ -140,6 +176,8 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
                         newFruit.setCenter(spawnX, spawnY)
                         newFruit.startPhysics()
                         world.add(newFruit, Layer.FRUIT)
+
+                        scoreManager.addScoreForMerge(nextGrade)
                     }
                     return
                 }
@@ -148,12 +186,13 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        // [변경] Detector에게 게임 오버 상태를 확인받아 입력을 통제합니다.
+        if (gameOverDetector.isGameOver) return true
+
         when (event.action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                 currentFruit?.let {
-                    // 좌우 벽 경계 제한
                     it.x = event.x.coerceIn(playBoxLeft + it.radius, playBoxRight - it.radius)
-                    // [추가] 드래그하는 도중 터치 오차로 Y축이 흔들리지 않도록 검정 선(250f)에 완전히 고정
                     it.y = playBoxTop
                 }
             }
@@ -172,10 +211,21 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     }
 
     override fun draw(canvas: Canvas) {
-        // 검정색 사각형 플레이 상자 그리기
         canvas.drawRect(playBoxLeft, playBoxTop, playBoxRight, groundY, wallPaint)
+        canvas.drawLine(playBoxLeft, playBoxTop, playBoxRight, playBoxTop, deadLinePaint)
+
+        canvas.drawText("Best score", 180f, 80f, uiLabelPaint)
+        canvas.drawText("${scoreManager.bestScore}", 180f, 145f, uiScorePaint)
+
+        canvas.drawText("Score", 650f, 80f, uiLabelPaint)
+        canvas.drawText("${scoreManager.currentScore}", 650f, 145f, uiScorePaint)
 
         super.draw(canvas)
+
+        // [변경] Detector의 상태 값에 맞춰 게임오버 텍스트 출력
+        if (gameOverDetector.isGameOver) {
+            canvas.drawText("GAME OVER", gameWidth / 2, gameHeight / 2, gameOverPaint)
+        }
     }
 
     override fun touchObjects(): List<IGameObject>? = null
