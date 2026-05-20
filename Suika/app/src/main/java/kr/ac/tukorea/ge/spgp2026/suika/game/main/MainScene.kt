@@ -21,19 +21,19 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
 
     private var currentFruit: Fruit? = null
     private val wallPaint = Paint().apply {
-        color = Color.BLACK  // 가이드라인을 더 명확하게 보기 위해 검은색으로 변경
+        color = Color.BLACK
         style = Paint.Style.STROKE
         strokeWidth = 10f
     }
 
-    // [수정] 화면 전체 크기 및 실제 플레이 박스 경계 정의
+    // 화면 전체 크기 및 실제 플레이 박스 경계 정의
     private val gameWidth = 900f
     private val gameHeight = 1600f
 
-    private val playBoxTop = 250f     // 이 선 윗부분(0~250)을 UI 공간으로 비워둡니다.
+    private val playBoxTop = 250f     // UI 공간 경계선
     private val playBoxLeft = 20f     // 좌측 벽 여백
     private val playBoxRight = 880f   // 우측 벽 여백
-    private val groundY = 1550f       // 바닥 높이 (플레이 영역 높이 총 1300px 확보)
+    private val groundY = 1550f       // 바닥 높이
 
     init {
         prepareNextFruit()
@@ -44,8 +44,8 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
         val grade = (0..2).random()
         val fruit = Fruit(grade)
 
-        // [수정] 플레이 박스 윗마진(250px) 직전에서 조준할 수 있도록 낙하 대기 높이를 180f로 변경
-        fruit.setCenter(gameWidth / 2, 180f)
+        // [수정] 과일의 중앙(Center Y)이 검정 사각형 상단 선(playBoxTop = 250f)에 정확히 일치하도록 설정
+        fruit.setCenter(gameWidth / 2, playBoxTop)
         currentFruit = fruit
         world.add(fruit, Layer.TOP_FRUIT)
     }
@@ -63,7 +63,7 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
         for (i in fruits.indices) {
             val f1 = fruits[i]
 
-            // [수정] 1. 새롭게 정의된 플레이 박스 사방 벽 및 바닥 충돌 처리
+            // 1. 플레이 박스 사방 벽 및 바닥 충돌 처리
             if (f1.x - f1.radius < playBoxLeft) {
                 f1.x = playBoxLeft + f1.radius
                 f1.dx *= -0.5f
@@ -79,13 +79,13 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
                 f1.dx *= 0.8f // 바닥 마찰력
             }
 
-            // [추가] 과일이 연쇄 충돌로 인해 위쪽 UI 영역(250px)으로 튀어 올라가는 것을 방지
+            // 과일이 위쪽 UI 영역으로 튀어 올라가는 것을 방지
             if (f1.y - f1.radius < playBoxTop && f1.dy < 0) {
                 f1.y = playBoxTop + f1.radius
-                f1.dy *= -0.2f // 천장에 부딪히면 아래로 튕김
+                f1.dy *= -0.2f
             }
 
-            // 2. 과일 간 밀어내기 및 굴러떨어지기 로직 (동일)
+            // 2. 과일 간 밀어내기 및 굴러떨어지기 로직
             for (j in i + 1 until fruits.size) {
                 val f2 = fruits[j]
                 val distX = f2.x - f1.x
@@ -151,8 +151,10 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
         when (event.action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                 currentFruit?.let {
-                    // [수정] 조준 드래그 시에도 새로 지정한 좌우 벽 경계 안에서만 움직이도록 제한
+                    // 좌우 벽 경계 제한
                     it.x = event.x.coerceIn(playBoxLeft + it.radius, playBoxRight - it.radius)
+                    // [추가] 드래그하는 도중 터치 오차로 Y축이 흔들리지 않도록 검정 선(250f)에 완전히 고정
+                    it.y = playBoxTop
                 }
             }
             MotionEvent.ACTION_UP -> {
@@ -170,7 +172,7 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     }
 
     override fun draw(canvas: Canvas) {
-        // [수정] 전체 화면이 아닌 비워둔 상단 아래부터 플레이 상자가 그려지도록 크기 수정
+        // 검정색 사각형 플레이 상자 그리기
         canvas.drawRect(playBoxLeft, playBoxTop, playBoxRight, groundY, wallPaint)
 
         super.draw(canvas)
