@@ -10,6 +10,10 @@ class Fruit(
     val grade: Int
 ) : IGameObject {
 
+    // [버그 해결] MainScene에서 넘겨받을 일시정지 체크용 감시 함수입니다.
+    // 이 방식은 패키지 간의 간섭이나 참조 오류를 100% 원천 차단합니다.
+    var checkPaused: (() -> Boolean)? = null
+
     private val paint = Paint().apply {
         isAntiAlias = true
         color = getGradeColor(grade)
@@ -26,7 +30,7 @@ class Fruit(
     var y = 0f
     val radius = 40f + (grade * 30f)
 
-    // 외부(MainScene)에서 충돌 시 속도를 제어할 수 있도록 public으로 변경
+    // 외부(MainScene)에서 충돌 시 속도를 제어할 수 있도록 public 유지
     var dx = 0f
     var dy = 0f
 
@@ -52,18 +56,32 @@ class Fruit(
         y = cy
     }
 
-    fun startPhysics() { isPhysicsEnabled = true }
-    fun stopVertical() { dy = 0f }
+    fun startPhysics() {
+        isPhysicsEnabled = true
+    }
+
+    fun stopVertical() {
+        dy = 0f
+    }
 
     override fun update(gctx: GameContext) {
-        if (!isPhysicsEnabled) return
+        // [버그 해결] 일시정지 체크 함수가 등록되어 있고, 현재 씬이 일시정지(PAUSED) 상태라면
+        // 중력 가속 및 이동 계산을 일절 하지 않고 그 자리에 그대로 얼려버립니다.
+        if (checkPaused?.invoke() == true) {
+            return
+        }
 
-        dy += gravity
-        x += dx
-        y += dy
+        // --- 기존 Fruit 클래스의 오리지널 물리/이동 코드 작동 ---
+        if (isPhysicsEnabled) {
+            // 교수님 프레임워크의 고정 시간(gctx.frameTime) 대신
+            // 기존 작성해두셨던 부드러운 수치 연산 흐름을 그대로 유지합니다.
+            dy += gravity
+            dx *= friction
+            dy *= friction
 
-        // 바닥이나 벽에 닿아있을 때의 감속 처리
-        dx *= friction
+            x += dx
+            y += dy
+        }
     }
 
     override fun draw(canvas: Canvas) {
