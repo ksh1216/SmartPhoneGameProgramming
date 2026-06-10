@@ -27,6 +27,8 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     private lateinit var scoreManager: ScoreManager
     private val gameOverDetector = GameOverDetector()
 
+    private var touchConsumedByUI = false // UI 버튼 터치에 다운 이벤트를 소모했는지 여부
+
     var gameState = State.PLAYING
         private set
 
@@ -108,12 +110,14 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     }
 
     private fun prepareNextFruit() {
-        if (gameOverDetector.isGameOver || gameState == State.PAUSED) return
+        if (gameOverDetector.isGameOver) return
+        // [버그 2번 해결 파트 A] 일시정지 중일 때 타이머가 완료되어 이 함수가 불리더라도,
+        // 무작정 return하지 않고 다음 게임 재개 시 보급되도록 구조를 안정화합니다.
+        if (gameState == State.PAUSED) return
 
         val grade = (0..2).random()
         val fruit = Fruit(grade)
 
-        // [체크!] 과일에게 내 상태가 PAUSED인지 감시하는 함수를 쥐여줍니다.
         fruit.checkPaused = { this.gameState == State.PAUSED }
 
         fruit.setCenter(gameWidth / 2, playBoxTop)
@@ -128,6 +132,10 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
             return true
         } else if (gameState == State.PAUSED) {
             gameState = State.PLAYING
+            // 뒤로가기로 게임을 재개할 때도 과일 스폰 보장
+            if (currentFruit == null) {
+                prepareNextFruit()
+            }
             return true
         }
         return false
@@ -205,8 +213,6 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
                         world.remove(f2, Layer.FRUIT)
 
                         val newFruit = Fruit(nextGrade)
-
-                        // [체크!] 합성된 과일에게도 내 상태 감시 함수 연결!
                         newFruit.checkPaused = { this.gameState == State.PAUSED }
 
                         newFruit.setCenter(spawnX, spawnY)
@@ -237,24 +243,37 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
         val ty = touchPts[1]
 
         if (event.action == MotionEvent.ACTION_DOWN) {
+            // 기본적으로 터치가 시작될 때는 플래그를 초기화합니다.
+            touchConsumedByUI = false
+
             if (gameState == State.PAUSED) {
                 if (resumeBtnRect.contains(tx, ty)) {
                     gameState = State.PLAYING
+                    if (currentFruit == null) {
+                        prepareNextFruit()
+                    }
+                    touchConsumedByUI = true // [핵심] UI 클릭에 손가락을 썼다고 기록!
                     return true
                 }
                 if (lobbyBtnRect.contains(tx, ty)) {
                     (gctx.view.context as? android.app.Activity)?.finish()
+                    touchConsumedByUI = true
                     return true
                 }
+                // 팝업창 뒤의 과일이 반응하지 않도록 일시정지 상태일 땐 무조건 처리 소모
+                touchConsumedByUI = true
                 return true
             }
+
             if (gameState == State.PLAYING && pauseBtnRect.contains(tx, ty)) {
                 gameState = State.PAUSED
+                touchConsumedByUI = true // [핵심] 일시정지 버튼을 누를 때도 기록!
                 return true
             }
         }
 
-        if (gameState == State.PLAYING) {
+        // 오직 게임 플레이 중이고, 이번 터치가 UI를 누르는 데 사용되지 않았을 때만 과일 조작을 허용합니다.
+        if (gameState == State.PLAYING && !touchConsumedByUI) {
             when (event.action) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                     currentFruit?.let {
@@ -273,6 +292,12 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
                 }
             }
         }
+
+        // 손가락을 뗄 때 플래그를 다시 초기화하여 다음 터치에 영향이 없도록 합니다.
+        if (event.action == MotionEvent.ACTION_UP) {
+            touchConsumedByUI = false
+        }
+
         return true
     }
 
