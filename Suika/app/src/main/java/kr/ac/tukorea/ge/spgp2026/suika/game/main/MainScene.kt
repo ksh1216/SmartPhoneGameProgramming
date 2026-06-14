@@ -307,7 +307,14 @@ class MainScene(gctx: GameContext) : Scene(gctx) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (gameState == State.GAME_OVER || gameOverDetector.isGameOver) return true
+        // 🌟 [게임오버 탈출 흐름 개량]
+        // 게임오버 상태일 때, 유저가 화면의 아무 곳이나 터치(손가락을 대는 순간)하면 로비로 즉시 빠져나갑니다.
+        if (gameState == State.GAME_OVER || gameOverDetector.isGameOver) {
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                (gctx.view.context as? android.app.Activity)?.finish()
+            }
+            return true
+        }
 
         val transform = gctx.metrics.transformMatrix
         if (transform.invert(inverseMatrix)) {
