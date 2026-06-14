@@ -1,5 +1,13 @@
 # Team Project 최종발표
 
+
+## 발표 영상
+* https://youtu.be/dNt35gyO7QQ
+
+
+---
+
+
 ## <게임 소개>
 **수박 게임 (Suika game)** - 과일들을 떨어뜨려 같은 과일들을 합치는 캐주얼 게임
 
