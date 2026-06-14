@@ -1,8 +1,9 @@
 package kr.ac.tukorea.ge.spgp2026.suika.game.main
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.RectF
 import kr.ac.tukorea.ge.spgp2026.a2dg.objects.IGameObject
 import kr.ac.tukorea.ge.spgp2026.a2dg.view.GameContext
 
@@ -10,83 +11,77 @@ class Fruit(
     val grade: Int
 ) : IGameObject {
 
-    // [버그 해결] MainScene에서 넘겨받을 일시정지 체크용 감시 함수입니다.
-    // 이 방식은 패키지 간의 간섭이나 참조 오류를 100% 원천 차단합니다.
     var checkPaused: (() -> Boolean)? = null
-
-    private val paint = Paint().apply {
-        isAntiAlias = true
-        color = getGradeColor(grade)
-        style = Paint.Style.FILL
-    }
-    private val strokePaint = Paint().apply {
-        isAntiAlias = true
-        color = Color.BLACK
-        style = Paint.Style.STROKE
-        strokeWidth = 5f
-    }
 
     var x = 0f
     var y = 0f
     val radius = 40f + (grade * 30f)
 
-    // 외부(MainScene)에서 충돌 시 속도를 제어할 수 있도록 public 유지
     var dx = 0f
     var dy = 0f
 
-    private val gravity = 0.8f   // 기존 1.2f에서 감소시켜 부드러운 낙하 유도
-    private val friction = 0.96f // 마찰력을 살짝 줄여 더 잘 미끄러지게 함
+    // --- [회전 기능 핵심 변수 추가] ---
+    var angle = 0f // 과일의 현재 회전 각도 (단위: 도/Degree)
+
+    private val gravity = 0.8f
+    private val friction = 0.96f
     private var isPhysicsEnabled = false
 
-    private fun getGradeColor(grade: Int): Int {
-        return when (grade) {
-            0 -> Color.parseColor("#FFCDD2")
-            1 -> Color.parseColor("#F48FB1")
-            2 -> Color.parseColor("#CE93D8")
-            3 -> Color.parseColor("#FFE082")
-            4 -> Color.parseColor("#FFAB91")
-            5 -> Color.parseColor("#EF5350")
-            6 -> Color.parseColor("#4CAF50")
-            else -> Color.WHITE
-        }
-    }
+    var bitmap: Bitmap? = null
+    private val dstRect = RectF()
+    private val bitmapPaint = Paint().apply { isAntiAlias = true }
 
     fun setCenter(cx: Float, cy: Float) {
         x = cx
         y = cy
     }
 
-    fun startPhysics() {
-        isPhysicsEnabled = true
-    }
-
-    fun stopVertical() {
-        dy = 0f
-    }
+    fun startPhysics() { isPhysicsEnabled = true }
+    fun stopVertical() { dy = 0f }
 
     override fun update(gctx: GameContext) {
-        // [버그 해결] 일시정지 체크 함수가 등록되어 있고, 현재 씬이 일시정지(PAUSED) 상태라면
-        // 중력 가속 및 이동 계산을 일절 하지 않고 그 자리에 그대로 얼려버립니다.
-        if (checkPaused?.invoke() == true) {
-            return
-        }
+        if (checkPaused?.invoke() == true) return
 
-        // --- 기존 Fruit 클래스의 오리지널 물리/이동 코드 작동 ---
         if (isPhysicsEnabled) {
-            // 교수님 프레임워크의 고정 시간(gctx.frameTime) 대신
-            // 기존 작성해두셨던 부드러운 수치 연산 흐름을 그대로 유지합니다.
             dy += gravity
             dx *= friction
             dy *= friction
-
             x += dx
             y += dy
+
+            // --- [회전 물리 주입] ---
+            // 과일이 좌우로 움직이는 속도(dx)에 비례해서 각도를 변화시킵니다.
+            // 반지름(radius)이 클수록(큰 과일일수록) 무거우므로 회전 속도를 살짝 조절해 줍니다.
+            val rotationFactor = 2.0f
+            angle += (dx / radius) * (180f / Math.PI.toFloat()) * rotationFactor
+
+            // 각도가 너무 커져서 오버플로우가 나지 않도록 360도 주기로 제한해 줍니다.
+            if (angle > 360f) angle -= 360f
+            if (angle < -360f) angle += 360f
         }
     }
 
     override fun draw(canvas: Canvas) {
-        canvas.drawCircle(x, y, radius, paint)
-        canvas.drawCircle(x, y, radius, strokePaint)
+        val bmp = bitmap
+        if (bmp != null) {
+            // 이미지를 그리기 전에 도화지(Canvas) 자체를 과일 중심점을 기준으로 회전시킵니다.
+            canvas.save() // 현재 도화지 상태 저장
+
+            // 과일의 중심 좌표(x, y)를 기준으로 현재 계산된 angle만큼 도화지를 돌립니다.
+            canvas.rotate(angle, x, y)
+
+            // 회전된 도화지 위에 비트맵 이미지를 그립니다.
+            dstRect.set(x - radius, y - radius, x + radius, y + radius)
+            canvas.drawBitmap(bmp, null, dstRect, bitmapPaint)
+
+            canvas.restore() // 다음 오브젝트들을 위해 도화지 회전 상태를 원래대로 복구
+        } else {
+            val fallbackPaint = Paint().apply {
+                color = android.graphics.Color.GRAY
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(x, y, radius, fallbackPaint)
+        }
     }
 
     fun isCollidingWith(other: Fruit): Boolean {
